@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "feature/**", "fix/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # [PENDING] Engineer must update this section for the specific language
+    # Example:
+    # - name: Set up Python
+    #   uses: actions/setup-python@v5
+    #   with:
+    #     python-version: "3.12"
+    
+    # Generic setup hook (if Makefile has setup target)
+    - name: Setup Environment
+      run: make setup || echo "No setup command defined"
+        
+    - name: Run Lint
+      run: make lint
+      
+    - name: Run Tests
+      run: make test

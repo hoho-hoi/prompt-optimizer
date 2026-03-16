@@ -1,0 +1,12 @@
+# General
+.env
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+
+# Project Specific
+scratch/
+
+# Note: Engineer should add language-specific ignores (e.g., __pycache__, node_modules, etc.)
