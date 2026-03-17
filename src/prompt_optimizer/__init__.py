@@ -7,10 +7,17 @@ from prompt_optimizer.core import (
     ImproveResult,
     InputValidationError,
     Judgment,
+    PromptModule,
+    PromptModuleType,
+    RenderedPrompt,
+    ResponseValidationError,
+    StructuredImproveResponse,
     create_application_metadata,
     load_improve_request_from_file,
     load_improve_request_from_text,
     normalize_improve_request_payload,
+    normalize_structured_improve_response_payload,
+    parse_structured_improve_response,
 )
 
 __all__ = [
@@ -20,8 +27,15 @@ __all__ = [
     "ImproveResult",
     "InputValidationError",
     "Judgment",
+    "PromptModule",
+    "PromptModuleType",
+    "RenderedPrompt",
+    "ResponseValidationError",
+    "StructuredImproveResponse",
     "create_application_metadata",
     "load_improve_request_from_file",
     "load_improve_request_from_text",
+    "normalize_structured_improve_response_payload",
     "normalize_improve_request_payload",
+    "parse_structured_improve_response",
 ]
