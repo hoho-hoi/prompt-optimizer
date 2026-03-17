@@ -2,30 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "feature/**", "fix/**" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    # [PENDING] Engineer must update this section for the specific language
-    # Example:
-    # - name: Set up Python
-    #   uses: actions/setup-python@v5
-    #   with:
-    #     python-version: "3.12"
-    
-    # Generic setup hook (if Makefile has setup target)
-    - name: Setup Environment
-      run: make setup || echo "No setup command defined"
-        
-    - name: Run Lint
-      run: make lint
-      
-    - name: Run Tests
-      run: make test
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: make setup
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run tests
+        run: make test
