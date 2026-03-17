@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+from uuid import uuid4
 
 
 class DomainValidationError(ValueError):
@@ -16,11 +17,12 @@ class Judgment(StrEnum):
     IMPROVEMENT_REQUIRED = "改善必須"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ImproveRequest:
     """Represent normalized input for a prompt improvement operation.
 
     Attributes:
+        request_id: Stable session-scoped identifier for the request.
         original_prompt: The original prompt text that must be evaluated.
         improvement_requests: Optional user requests that guide evaluation.
         io_examples: Optional examples that provide desired input/output behavior.
@@ -28,6 +30,7 @@ class ImproveRequest:
         context: Optional background information for the request.
     """
 
+    request_id: str = field(default_factory=lambda: str(uuid4()))
     original_prompt: str
     improvement_requests: tuple[str, ...] = ()
     io_examples: tuple[str, ...] = ()
@@ -36,6 +39,7 @@ class ImproveRequest:
 
     def __post_init__(self) -> None:
         """Validate the request after construction."""
+        _require_non_empty_text(self.request_id, "request_id")
         _require_non_empty_text(self.original_prompt, "original_prompt")
         _validate_text_items(self.improvement_requests, "improvement_requests")
         _validate_text_items(self.io_examples, "io_examples")
@@ -50,6 +54,7 @@ class ImproveRequest:
             dict[str, object]: A JSON-serializable representation of the request.
         """
         return {
+            "requestId": self.request_id,
             "originalPrompt": self.original_prompt,
             "improvementRequests": list(self.improvement_requests),
             "ioExamples": list(self.io_examples),
@@ -58,11 +63,12 @@ class ImproveRequest:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ImproveResult:
     """Represent the evaluated result of a prompt improvement operation.
 
     Attributes:
+        result_id: Stable persisted identifier for the improvement result.
         judgment: The domain judgment for the original prompt.
         reason: Human-readable reasoning for the judgment.
         improved_prompt: The resulting prompt text after evaluation.
@@ -70,6 +76,7 @@ class ImproveResult:
         original_prompt: The original input prompt used for invariant validation.
     """
 
+    result_id: str = field(default_factory=lambda: str(uuid4()))
     judgment: Judgment
     reason: str
     improved_prompt: str
@@ -78,6 +85,7 @@ class ImproveResult:
 
     def __post_init__(self) -> None:
         """Validate cross-field invariants for the result."""
+        _require_non_empty_text(self.result_id, "result_id")
         _require_non_empty_text(self.reason, "reason")
         _require_non_empty_text(self.improved_prompt, "improved_prompt")
         _require_non_empty_text(self.original_prompt, "original_prompt")
@@ -112,6 +120,7 @@ class ImproveResult:
             dict[str, str]: A JSON-serializable representation of the result.
         """
         return {
+            "resultId": self.result_id,
             "judgment": self.judgment.value,
             "reason": self.reason,
             "improvedPrompt": self.improved_prompt,
