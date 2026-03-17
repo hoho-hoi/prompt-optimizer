@@ -1,24 +1,17 @@
 .PHONY: test lint format clean help setup
 
-# NOTE:
-# These targets are safe defaults to prevent CI from failing on a fresh clone.
-# Replace the placeholders with stack-specific commands once the toolchain is decided.
-# Keep the informational messages so callers know the real work is pending.
-
 test:
-	@echo "[INFO] No tests are defined yet. Add your test runner command here."
-	@echo "[INFO] Example: pytest tests/ or npm test"
+	uv run pytest
 
 lint:
-	@echo "[INFO] No linters are configured yet. Add your lint command here."
-	@echo "[INFO] Example: ruff check . or eslint ."
+	uv run ruff check .
+	uv run mypy src tests
 
 format:
-	@echo "[INFO] No formatter is configured yet. Add your format command here."
-	@echo "[INFO] Example: ruff format . or prettier --write ."
+	uv run ruff format .
 
 setup:
-	@echo "No setup required or not implemented."
+	uv sync --dev
 
 clean:
 	rm -rf scratch/*
