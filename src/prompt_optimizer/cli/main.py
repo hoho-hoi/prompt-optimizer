@@ -8,8 +8,12 @@ from typing import Annotated
 import typer
 
 from prompt_optimizer.core import (
+    ConfigurationValidationError,
     InputValidationError,
+    ModelGatewayError,
+    ResponseValidationError,
     create_application_metadata,
+    create_default_improve_service,
     load_improve_request_from_file,
     load_improve_request_from_text,
 )
@@ -46,27 +50,44 @@ def improve_prompt(
         ),
     ] = None,
 ) -> None:
-    """Load and validate an improve request payload.
+    """Execute the improve command from file input or standard input.
 
     Args:
         input_file_path: Optional file path for a JSON payload. When omitted,
             the command reads from standard input.
 
     Returns:
-        None: Writes the normalized payload to standard output.
+        None: Writes the structured improve result to standard output.
     """
     try:
         if input_file_path is not None:
             normalized_request = load_improve_request_from_file(input_file_path)
         else:
             normalized_request = load_improve_request_from_text(sys.stdin.read())
+
+        improve_service = create_default_improve_service()
+        improve_result = improve_service.execute_improve_request(normalized_request)
     except InputValidationError as error:
         typer.echo(f"Input validation error: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    except ConfigurationValidationError as error:
+        typer.echo(f"Configuration error: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    except ResponseValidationError as error:
+        typer.echo(f"Response validation error: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    except ModelGatewayError as error:
+        typer.echo(f"Model execution error: {error}", err=True)
         raise typer.Exit(code=1) from error
 
     typer.echo(
         json.dumps(
-            {"request": normalized_request.to_payload()},
+            {
+                "judgment": improve_result.judgment.value,
+                "reason": improve_result.reason,
+                "improved_prompt": improve_result.improved_prompt,
+                "changes": improve_result.changes_summary,
+            },
             ensure_ascii=False,
         )
     )

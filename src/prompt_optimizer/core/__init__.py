@@ -20,6 +20,11 @@ from prompt_optimizer.core.configuration_models import (
     ModelApiConfiguration,
     OutputFormat,
 )
+from prompt_optimizer.core.improve_orchestrator import (
+    ImprovePromptService,
+    ImprovePromptUseCase,
+    create_default_improve_service,
+)
 from prompt_optimizer.core.improve_request_loader import (
     InputValidationError,
     load_improve_request_from_file,
@@ -64,6 +69,8 @@ __all__ = [
     "DomainValidationError",
     "ExecutionConfiguration",
     "ImproveRequest",
+    "ImprovePromptService",
+    "ImprovePromptUseCase",
     "ImproveResult",
     "InputValidationError",
     "Judgment",
@@ -93,6 +100,7 @@ __all__ = [
     "load_improve_request_from_file",
     "load_improve_request_from_text",
     "load_model_api_configuration",
+    "create_default_improve_service",
     "normalize_application_setting_payload",
     "normalize_execution_configuration_payload",
     "normalize_structured_improve_response_payload",

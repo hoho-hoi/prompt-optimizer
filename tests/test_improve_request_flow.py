@@ -1,3 +1,4 @@
+import importlib
 import json
 from pathlib import Path
 
@@ -11,10 +12,29 @@ from prompt_optimizer.core import (
     ImproveResult,
     InputValidationError,
     Judgment,
+    ModelConnectionError,
     load_improve_request_from_file,
     load_improve_request_from_text,
     normalize_improve_request_payload,
 )
+
+cli_main_module = importlib.import_module("prompt_optimizer.cli.main")
+
+
+class RecordingImproveService:
+    def __init__(self, *, improve_result: ImproveResult) -> None:
+        self.improve_result = improve_result
+        self.recorded_request: ImproveRequest | None = None
+
+    def execute_improve_request(self, improve_request: ImproveRequest) -> ImproveResult:
+        self.recorded_request = improve_request
+        return self.improve_result
+
+
+class FailingImproveService:
+    def execute_improve_request(self, improve_request: ImproveRequest) -> ImproveResult:
+        del improve_request
+        raise ModelConnectionError("Unable to reach model API.")
 
 
 def test_normalize_improve_request_with_required_field_only() -> None:
@@ -158,7 +178,9 @@ def test_improve_result_preserves_explicit_identifier() -> None:
     assert improve_result.result_id == "result-persisted-001"
 
 
-def test_improve_command_reads_payload_from_input_file(tmp_path: Path) -> None:
+def test_improve_command_reads_payload_from_input_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     input_file_path = tmp_path / "request.json"
     input_file_path.write_text(
         json.dumps(
@@ -169,18 +191,55 @@ def test_improve_command_reads_payload_from_input_file(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+    improve_service = RecordingImproveService(
+        improve_result=ImproveResult(
+            judgment=Judgment.IMPROVEMENT_RECOMMENDED,
+            reason="The prompt needs clearer constraints.",
+            improved_prompt="Explain the deployment process in plain language.",
+            changes=("Added an explicit plain-language instruction.",),
+            original_prompt="Explain the deployment process.",
+        )
+    )
+    monkeypatch.setattr(
+        cli_main_module,
+        "create_default_improve_service",
+        lambda: improve_service,
+        raising=False,
+    )
     cli_runner = CliRunner()
 
     result = cli_runner.invoke(application_cli, ["improve", "--input", str(input_file_path)])
 
     assert result.exit_code == 0
     response_payload = json.loads(result.stdout)
-    assert response_payload["request"]["requestId"]
-    assert response_payload["request"]["originalPrompt"] == "Explain the deployment process."
-    assert response_payload["request"]["additionalConstraints"] == ["Use plain language."]
+    assert response_payload == {
+        "judgment": "改善推奨",
+        "reason": "The prompt needs clearer constraints.",
+        "improved_prompt": "Explain the deployment process in plain language.",
+        "changes": "Added an explicit plain-language instruction.",
+    }
+    assert improve_service.recorded_request is not None
+    assert improve_service.recorded_request.additional_constraints == ("Use plain language.",)
 
 
-def test_improve_command_reads_payload_from_standard_input() -> None:
+def test_improve_command_reads_payload_from_standard_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    improve_service = RecordingImproveService(
+        improve_result=ImproveResult(
+            judgment=Judgment.NO_IMPROVEMENT_NEEDED,
+            reason="The prompt is already concise and clear.",
+            improved_prompt="Generate a retrospective summary.",
+            changes=(),
+            original_prompt="Generate a retrospective summary.",
+        )
+    )
+    monkeypatch.setattr(
+        cli_main_module,
+        "create_default_improve_service",
+        lambda: improve_service,
+        raising=False,
+    )
     cli_runner = CliRunner()
 
     result = cli_runner.invoke(
@@ -196,9 +255,14 @@ def test_improve_command_reads_payload_from_standard_input() -> None:
 
     assert result.exit_code == 0
     response_payload = json.loads(result.stdout)
-    assert response_payload["request"]["requestId"]
-    assert response_payload["request"]["originalPrompt"] == "Generate a retrospective summary."
-    assert response_payload["request"]["improvementRequests"] == ["Reduce repetition."]
+    assert response_payload == {
+        "judgment": "改善不要",
+        "reason": "The prompt is already concise and clear.",
+        "improved_prompt": "Generate a retrospective summary.",
+        "changes": "なし",
+    }
+    assert improve_service.recorded_request is not None
+    assert improve_service.recorded_request.improvement_requests == ("Reduce repetition.",)
 
 
 def test_improve_command_rejects_invalid_input_file_payload(tmp_path: Path) -> None:
@@ -219,3 +283,29 @@ def test_improve_command_rejects_invalid_standard_input_payload() -> None:
 
     assert result.exit_code == 1
     assert "valid JSON object" in result.output
+
+
+def test_improve_command_returns_non_zero_exit_code_for_model_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    input_file_path = tmp_path / "request.json"
+    input_file_path.write_text(
+        json.dumps(
+            {
+                "originalPrompt": "Explain the deployment process.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        cli_main_module,
+        "create_default_improve_service",
+        lambda: FailingImproveService(),
+        raising=False,
+    )
+    cli_runner = CliRunner()
+
+    result = cli_runner.invoke(application_cli, ["improve", "--input", str(input_file_path)])
+
+    assert result.exit_code == 1
+    assert "Unable to reach model API" in result.output
